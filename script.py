@@ -2,78 +2,76 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-import mytools as mt
 import collections as col
 import scipy as sp
 import scipy.optimize as spopt
 
 plt.close('all')
 
-def gauss(x,amp,mu,sigma):
-	return amp*np.exp(-(x-mu)**2/(2*sigma**2))
+def _gaussvar(x,amp,mu,variance,bg=0):
+	return amp*np.exp(-(x-mu)**2/(2*variance))+bg
 
-def iter():
+def iter(factor):
+	# Generate random numbers with gaussian
+	# distribution, mu=0, sigma = 3
 	x=np.random.randn(10000)*3
 	
+	# Bin the counts
 	bins = 50
-	
-	# plt.hist(x,bins=bins)
-	
 	h,edge = np.histogram(x,bins=bins)
-	# sigma = 1e10
-	# sigma = None
-	sigma = np.sqrt(h)
-	sigma[sigma==0] = 1e10
-	
+
+	# Find the midpoints of the bins
 	mids = edge + (edge[1]-edge[0])/2
 	mids = mids[:-1]
-	
-	# plt.plot(mids,h,'o-')
-	# print gauss
-	# print mids
-	# print h
-	# print sigma
-	
-	# popt,pcov = spopt.curve_fit(gauss,mids,h,sigma=sigma)
-	popt,pcov = mt.gaussfit(mids,h,sigma_y=sigma)
 
-	# print popt
-	# print pcov
-	vari = np.sqrt(pcov[1,1])
+	# Expected error in counts is sqrt(counts)
+	sigma = np.sqrt(h)*1
+
+	# Error of zero counts isn't zero, but less than one.
+	# Use 0.5 as a guess.
+	sigma[sigma==0] = 0.5
+
+	# Factor scales error, which should cause
+	# the pcov matrix to change
+	sigma = sigma*factor
 	
-	# x = np.linspace(-15,15,200)
-	# y = gauss(x,popt[0],popt[1],popt[2])
+	# Fit the histogram to a gaussian
+	# popt,pcov,red_chisq = mt.gaussfit(mids,h,sigma_y=sigma,plot=True,variance_bool=True)
+
+
+	# Find initial guesses
+	y=h
+	x=mids
+	amp = max(y)
+	mu  = sum(x*y)/sum(y)
+	variance = sum(x**2 * y)/sum(y)
+	bg  = 0
+	p0 = np.array((amp,mu,variance,bg))
 	
-	# plt.plot(mids,h,'o-',x,y)
-	# plt.figure()
-	# plt.plot(x,y)
-	
-	# print 'Mean is {} +/- {}.'.format(popt[1],vari)
-	# print 'One std dev range is {} to {}.'.format(popt[1]-vari,popt[1]+vari)
-	print '--------'
-	print popt[1]
-	print vari
+
+	# Do actual curve fit
+	func = _gaussvar
+	popt,pcov = spopt.curve_fit(func,x,y,sigma=sigma,p0=p0)
 
 	output = col.namedtuple('iterout',['popt','pcov'])
 	out = output(popt,pcov)
 	return out
 
-num_samples = 1000
-variances = np.ones(num_samples)
-means = np.ones(num_samples)
+num_samples       = 1000
+variances_regular = np.ones(num_samples)
+variances_large   = np.ones(num_samples)
+means_regular     = np.ones(num_samples)
+means_large       = np.ones(num_samples)
 for i in np.linspace(1,num_samples,num_samples)-1:
-	out = iter()
-	means[i] = out.popt[1]
-	variances[i] = out.pcov[1,1]
-	# mt.hist2d(out.x.flatten(),out.y.flatten(),bins=70)
+	out                  = iter(1)
+	means_regular[i]     = out.popt[2]
+	variances_regular[i] = out.pcov[2,2]
 
-print 'Std Dev. is {}'.format(np.std(means))
-print 'Average std dev is {}.'.format(np.mean(np.sqrt(variances)))
-print 'Std dev of std devs is {}.'.format(np.std(np.sqrt(variances)))
+	out                = iter(1e10)
+	means_large[i]     = out.popt[2]
+	variances_large[i] = out.pcov[2,2]
 
-# plt.hist(variances,bins=20)
-h,edge = mt.hist(means,bins=15)
-plt.figure()
-mt.gaussfit(edge,h)
+plt.hist(variances_regular,bins=20)
+plt.hist(variances_large,bins=20)
+
 plt.show()
-
