@@ -35,10 +35,6 @@ def iter(factor):
 	# the pcov matrix to change
 	sigma = sigma*factor
 	
-	# Fit the histogram to a gaussian
-	# popt,pcov,red_chisq = mt.gaussfit(mids,h,sigma_y=sigma,plot=True,variance_bool=True)
-
-
 	# Find initial guesses
 	y=h
 	x=mids
@@ -48,7 +44,6 @@ def iter(factor):
 	bg  = 0
 	p0 = np.array((amp,mu,variance,bg))
 	
-
 	# Do actual curve fit
 	func = _gaussvar
 	popt,pcov = spopt.curve_fit(func,x,y,sigma=sigma,p0=p0)
